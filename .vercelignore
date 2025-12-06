@@ -1,8 +1,19 @@
+cat > .vercelignore << 'EOF'
+# Ignorer les fichiers Python/Flask
 requirements.txt
 runtime.txt
 Procfile
-app.py
 *.py
 __pycache__/
 venv/
 .env
+
+# Ignorer les fichiers de développement
+node_modules/
+package-lock.json
+yarn.lock
+
+# Ignorer les fichiers système
+.DS_Store
+Thumbs.db
+EOF
