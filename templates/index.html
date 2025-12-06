@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur de Distillation Multicomposants | UM6P</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/compound-search.css') }}">
+    <!-- Bibliothèques graphiques -->
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Bibliothèque thermo (alternative) -->
+
+    <!-- <script src="https://unpkg.com/thermo.js@latest/dist/thermo.min.js"></script> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/coolprop-wasm@latest/dist/coolprop.min.js"></script> -->
+    
+    <style>
+        /* Styles inline pour démarrage rapide */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-section h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Écran de chargement -->
+    <div id="loading-screen" class="loading">
+        <i class="fas fa-spinner fa-spin fa-3x"></i>
+        <p>Chargement du simulateur de distillation...</p>
+    </div>
+
+    <!-- Application principale (cachée pendant le chargement) -->
+    <div id="app-container" style="display: none;">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="logo-section">
+                    <h1><i class="fas fa-flask"></i> Simulateur de Distillation Multicomposants</h1>
+                    <p class="subtitle">Modélisation et Simulation des Procédés - FSTS </p>
+                </div>
+                <div class="header-info">
+                    <p></p>
+                    <p class="version">Version Web 2.0</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="navbar navbar-sticky">
+            <div class="container">
+                <ul class="nav-menu">
+                    <li><a href="#configuration" class="active"><i class="fas fa-cogs"></i> Configuration</a></li>
+                    <li><a href="#simulation"><i class="fas fa-calculator"></i> Simulation</a></li>
+                    <li><a href="#resultats"><i class="fas fa-chart-bar"></i> Résultats</a></li>
+                    <li><a href="#visualisation"><i class="fas fa-chart-line"></i> Visualisation</a></li>
+                    <li><a href="#analyse"><i class="fas fa-microscope"></i> Analyse</a></li>
+                    <li><a href="#aide"><i class="fas fa-question-circle"></i> Aide</a></li>
+                </ul>
+                <button class="btn-run" onclick="app.runSimulation()">
+                    <i class="fas fa-play"></i> Lancer la Simulation
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="container">
+            <div class="grid-container">
+                <!-- Panel gauche: Configuration -->
+                <section class="card input-panel" id="configuration">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cogs"></i> Configuration du Système</h2>
+                        <div class="status-badge" id="config-status">
+                            <i class="fas fa-check-circle"></i> Prêt
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Section 1: Recherche et sélection des composés -->
+                        <div class="input-group">
+                            <h3><i class="fas fa-search"></i> 1. Sélection des Composés</h3>
+                            <p class="input-description">Recherchez et sélectionnez jusqu'à 3 composés pour la distillation ternaire</p>
+                            
+                            <div id="compound-search-container">
+                                <!-- Rempli dynamiquement par JavaScript -->
+                                <div class="loading-search">
+                                    <i class="fas fa-spinner fa-spin"></i> Chargement de la base de données...
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Section 2: Composition de l'alimentation -->
+                        <div class="input-group">
+                            <h3><i class="fas fa-percentage"></i> 2. Composition de l'Alimentation</h3>
+                            <div id="composition-inputs">
+                                <p class="placeholder-text">
+                                    Sélectionnez d'abord des composés pour définir la composition
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Section 3: Paramètres opératoires -->
+                        <div class="input-group">
+                            <h3><i class="fas fa-sliders-h"></i> 3. Paramètres Opératoires</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="feed-flow"><i class="fas fa-tachometer-alt"></i> Débit alimentation</label>
+                                    <div class="input-with-unit">
+                                        <input type="number" id="feed-flow" value="100.0" min="1" max="1000" step="0.1">
+                                        <span class="unit">kmol/h</span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pressure"><i class="fas fa-weight-hanging"></i> Pression</label>
+                                    <div class="input-with-unit">
+                                        <input type="number" id="pressure" value="101.325" min="50" max="500" step="0.1">
+                                        <span class="unit">kPa</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="feed-quality"><i class="fas fa-thermometer-half"></i> Qualité alimentation (q)</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="feed-quality" min="0" max="1" value="1.0" step="0.1" class="slider">
+                                        <div class="slider-value">
+                                            <span id="feed-quality-value">1.0</span>
+                                            <small>(liquide saturé)</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="efficiency"><i class="fas fa-percentage"></i> Efficacité plateaux</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="efficiency" min="50" max="90" value="70" step="1" class="slider">
+                                        <div class="slider-value">
+                                            <span id="efficiency-value">70</span>%
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Section 4: Spécifications de séparation -->
+                        <div class="input-group" id="separation-specs">
+                            <h3><i class="fas fa-filter"></i> 4. Spécifications de Séparation</h3>
+                            <p class="input-description">Définissez les récupérations pour les composés clés</p>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="recovery-lk"><i class="fas fa-arrow-up"></i> Récupération LK (distillat)</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="recovery-lk" min="80" max="99.9" value="95" step="0.1" class="slider">
+                                        <div class="slider-value">
+                                            <span id="recovery-lk-value">95.0</span>%
+                                        </div>
+                                    </div>
+                                    <div id="lk-name" class="component-name">--</div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="recovery-hk"><i class="fas fa-arrow-down"></i> Récupération HK (résidu)</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="recovery-hk" min="80" max="99.9" value="95" step="0.1" class="slider">
+                                        <div class="slider-value">
+                                            <span id="recovery-hk-value">95.0</span>%
+                                        </div>
+                                    </div>
+                                    <div id="hk-name" class="component-name">--</div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="reflux-factor"><i class="fas fa-retweet"></i> Facteur de reflux (R/R_min)</label>
+                                <div class="slider-container">
+                                    <input type="range" id="reflux-factor" min="1.1" max="2.5" value="1.3" step="0.05" class="slider">
+                                    <div class="slider-value">
+                                        <span id="reflux-factor-value">1.30</span>
+                                    </div>
+                                </div>
+                                <p class="slider-description">Rapport entre le reflux opératoire et le reflux minimum</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Informations système -->
+                        <div class="input-group" id="system-info-section">
+                            <h3><i class="fas fa-info-circle"></i> 5. Informations du Système</h3>
+                            <div id="key-components-display">
+                                <div class="info-placeholder">
+                                    <i class="fas fa-info-circle"></i>
+                                    <p>Les composés clés seront identifiés automatiquement après sélection</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Boutons d'action -->
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="app.runSimulation()">
+                                <i class="fas fa-play-circle"></i> Lancer la Simulation
+                            </button>
+                            <button class="btn btn-secondary" onclick="app.clearSelection()">
+                                <i class="fas fa-redo"></i> Nouvelle Configuration
+                            </button>
+                            <div class="example-buttons">
+                                <small>Exemples rapides:</small>
+                                <button class="btn-example" onclick="app.loadExample('btx')">BTX</button>
+                                <button class="btn-example" onclick="app.loadExample('alcohols')">Alcools</button>
+                                <button class="btn-example" onclick="app.loadExample('paraffins')">Paraffines</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel central: Résultats et Simulation -->
+                <section class="card results-panel" id="simulation">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-pie"></i> Résultats de la Simulation</h2>
+                        <div class="status-badge" id="simulation-status">
+                            <i class="fas fa-clock"></i> En attente
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Cartes récapitulatives -->
+                        <div class="summary-cards">
+                            <div class="summary-card">
+                                <div class="summary-icon" style="background: #4CAF50;">
+                                    <i class="fas fa-columns"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h4>Plateaux réels</h4>
+                                    <div class="summary-value" id="total-plates">--</div>
+                                    <small>Avec efficacité</small>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-icon" style="background: #2196F3;">
+                                    <i class="fas fa-retweet"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h4>Reflux opératoire</h4>
+                                    <div class="summary-value" id="reflux-ratio">--</div>
+                                    <small>R = L/D</small>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-icon" style="background: #FF9800;">
+                                    <i class="fas fa-bolt"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h4>Énergie rebouilleur</h4>
+                                    <div class="summary-value" id="reboiler-energy">-- kW</div>
+                                    <small>Chauffage requis</small>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-icon" style="background: #9C27B0;">
+                                    <i class="fas fa-tint"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h4>Vapeur consommée</h4>
+                                    <div class="summary-value" id="steam-consumption">-- kg/h</div>
+                                    <small>À 3 bar</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bilan Matière -->
+                        <div class="material-balance compact">
+                            <div class="stream-card compact">
+                                <div class="stream-header" style="background: #2196F3;">
+                                    <h4>Alimentation</h4>
+                                    <div class="stream-flow" id="feed-total">100.0 kmol/h</div>
+                                </div>
+                                <div class="stream-composition compact" id="feed-composition">
+                                    <p class="placeholder">Composition à définir</p>
+                                </div>
+                            </div>
+                            <div class="stream-arrow">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                            <div class="stream-card compact">
+                                <div class="stream-header" style="background: #4CAF50;">
+                                    <h4>Distillat</h4>
+                                    <div class="stream-flow" id="distillat-total">-- kmol/h</div>
+                                </div>
+                                <div class="stream-composition compact" id="distillat-composition">
+                                    <p class="placeholder">Résultats de simulation</p>
+                                </div>
+                            </div>
+                            <div class="stream-card compact">
+                                <div class="stream-header" style="background: #F44336;">
+                                    <h4>Résidu</h4>
+                                    <div class="stream-flow" id="residue-total">-- kmol/h</div>
+                                </div>
+                                <div class="stream-composition compact" id="residue-composition">
+                                    <p class="placeholder">Résultats de simulation</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Paramètres de conception -->
+                        <div class="results-section">
+                            <h3><i class="fas fa-cogs"></i> Paramètres de Conception</h3>
+                            <div class="parameters-grid">
+                                <div class="parameter-item">
+                                    <span class="parameter-label">N minimum (Fenske)</span>
+                                    <span class="parameter-value" id="n-min">--</span>
+                                </div>
+                                <div class="parameter-item">
+                                    <span class="parameter-label">R minimum (Underwood)</span>
+                                    <span class="parameter-value" id="r-min">--</span>
+                                </div>
+                                <div class="parameter-item">
+                                    <span class="parameter-label">N théorique (Gilliland)</span>
+                                    <span class="parameter-value" id="n-theoretical">--</span>
+                                </div>
+                                <div class="parameter-item">
+                                    <span class="parameter-label">Efficacité</span>
+                                    <span class="parameter-value" id="efficiency-result">--%</span>
+                                </div>
+                                <div class="parameter-item">
+                                    <span class="parameter-label">Plateau alimentation</span>
+                                    <span class="parameter-value" id="feed-stage">--</span>
+                                </div>
+                                <div class="parameter-item">
+                                    <span class="parameter-label">ΔT colonne</span>
+                                    <span class="parameter-value" id="delta-t">-- K</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Distribution détaillée -->
+                        <div class="results-section">
+                            <h3><i class="fas fa-exchange-alt"></i> Distribution des Composés</h3>
+                            <table class="distribution-table">
+                                <thead>
+                                    <tr>
+                                        <th>Composé</th>
+                                        <th>Alim (kmol/h)</th>
+                                        <th>Dist (kmol/h)</th>
+                                        <th>Rés (kmol/h)</th>
+                                        <th>Récup. D (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="distribution-body">
+                                    <tr>
+                                        <td colspan="5" class="empty-table">Exécutez une simulation pour voir les résultats</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel droit: Visualisations -->
+                <section class="card visualization-panel" id="visualisation">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-line"></i> Visualisations</h2>
+                        <div class="chart-controls">
+                            <select id="chart-select" onchange="app.changeChart()">
+                                <option value="composition">Profils de composition</option>
+                                <option value="temperature">Profil de température</option>
+                                <option value="shortcut">Diagramme de Gilliland</option>
+                                <option value="column">Schéma de la colonne</option>
+                                <option value="parametric">Étude paramétrique</option>
+                            </select>
+                            <button class="btn-chart-export" onclick="app.exportChart()">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="main-chart"></canvas>
+                            <div id="plotly-chart" style="display: none; width: 100%; height: 400px;"></div>
+                        </div>
+                        
+                        <!-- Informations sur le graphique -->
+                        <div class="chart-info" id="chart-info">
+                            <i class="fas fa-info-circle"></i>
+                            Sélectionnez un type de graphique pour visualiser les résultats
+                        </div>
+                        
+                        <!-- Légende interactive -->
+                        <div class="chart-legend" id="chart-legend"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Panel d'analyse avancée -->
+            <section class="card analysis-panel" id="analyse">
+                <div class="card-header">
+                    <h2><i class="fas fa-microscope"></i> Analyse Avancée</h2>
+                </div>
+                <div class="card-body">
+                    <div class="tabs">
+                        <button class="tab-btn active" onclick="app.openTab('energy')">
+                            <i class="fas fa-bolt"></i> Bilan Énergétique
+                        </button>
+                        <button class="tab-btn" onclick="app.openTab('economics')">
+                            <i class="fas fa-dollar-sign"></i> Analyse Économique
+                        </button>
+                        <button class="tab-btn" onclick="app.openTab('sensitivity')">
+                            <i class="fas fa-chart-line"></i> Analyse de Sensibilité
+                        </button>
+                        <button class="tab-btn" onclick="app.openTab('optimization')">
+                            <i class="fas fa-magic"></i> Optimisation
+                        </button>
+                    </div>
+                    
+                    <div class="tab-content active" id="energy-tab">
+                        <h4><i class="fas fa-bolt"></i> Analyse Énergétique Détaillée</h4>
+                        <div class="energy-grid">
+                            <div class="energy-card">
+                                <div class="energy-icon" style="background: #2196F3;">
+                                    <i class="fas fa-snowflake"></i>
+                                </div>
+                                <div class="energy-content">
+                                    <h5>Condenseur</h5>
+                                    <div class="energy-value" id="condenser-energy">-- kW</div>
+                                    <small>Refroidissement requis</small>
+                                    <div class="energy-details">
+                                        <span>Température: <span id="condenser-temp">-- °C</span></span>
+                                        <span>ΔH: <span id="condenser-dh">-- kJ/kmol</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="energy-card">
+                                <div class="energy-icon" style="background: #FF9800;">
+                                    <i class="fas fa-fire"></i>
+                                </div>
+                                <div class="energy-content">
+                                    <h5>Rebouilleur</h5>
+                                    <div class="energy-value" id="reboiler-energy-detailed">-- kW</div>
+                                    <small>Chauffage requis</small>
+                                    <div class="energy-details">
+                                        <span>Température: <span id="reboiler-temp">-- °C</span></span>
+                                        <span>ΔH: <span id="reboiler-dh">-- kJ/kmol</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="energy-card">
+                                <div class="energy-icon" style="background: #4CAF50;">
+                                    <i class="fas fa-balance-scale"></i>
+                                </div>
+                                <div class="energy-content">
+                                    <h5>Ratio Énergétique</h5>
+                                    <div class="energy-value" id="energy-ratio">--</div>
+                                    <small>Q<sub>R</sub>/Q<sub>C</sub></small>
+                                    <div class="energy-details">
+                                        <span>Efficacité thermique: <span id="thermal-efficiency">-- %</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="energy-card">
+                                <div class="energy-icon" style="background: #9C27B0;">
+                                    <i class="fas fa-tint"></i>
+                                </div>
+                                <div class="energy-content">
+                                    <h5>Consommation Utilités</h5>
+                                    <div class="energy-value" id="steam-consumption-detailed">-- kg/h</div>
+                                    <small>Vapeur à 3 bar</small>
+                                    <div class="energy-details">
+                                        <span>Coût estimé: <span id="steam-cost">-- $/h</span></span>
+                                        <span>Ratio: <span id="steam-ratio">-- kg/kg</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="energy-summary">
+                            <h5><i class="fas fa-chart-pie"></i> Répartition Énergétique</h5>
+                            <div class="energy-pie-chart">
+                                <canvas id="energy-pie-chart" width="200" height="200"></canvas>
+                                <div class="energy-labels">
+                                    <div class="energy-label">
+                                        <span class="label-color" style="background: #FF9800;"></span>
+                                        <span>Rebouilleur: <span id="pie-reboiler">--%</span></span>
+                                    </div>
+                                    <div class="energy-label">
+                                        <span class="label-color" style="background: #2196F3;"></span>
+                                        <span>Condenseur: <span id="pie-condenser">--%</span></span>
+                                    </div>
+                                    <div class="energy-label">
+                                        <span class="label-color" style="background: #4CAF50;"></span>
+                                        <span>Pertes: <span id="pie-losses">--%</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="economics-tab" style="display: none;">
+                        <h4><i class="fas fa-dollar-sign"></i> Analyse Économique Approchée</h4>
+                        <div class="economics-grid">
+                            <div class="economics-card">
+                                <h5><i class="fas fa-money-bill-wave"></i> Coûts d'Investissement</h5>
+                                <div class="economics-value" id="investment-cost">-- k$</div>
+                                <div class="economics-breakdown">
+                                    <span>Colonne: <span id="cost-column">--</span></span>
+                                    <span>Échangeurs: <span id="cost-exchangers">--</span></span>
+                                    <span>Installation: <span id="cost-installation">--</span></span>
+                                </div>
+                            </div>
+                            <div class="economics-card">
+                                <h5><i class="fas fa-bolt"></i> Coûts Opératoires</h5>
+                                <div class="economics-value" id="operating-cost">-- $/h</div>
+                                <div class="economics-breakdown">
+                                    <span>Énergie: <span id="cost-energy">--</span></span>
+                                    <span>Maintenance: <span id="cost-maintenance">--</span></span>
+                                    <span>Personnel: <span id="cost-personnel">--</span></span>
+                                </div>
+                            </div>
+                            <div class="economics-card">
+                                <h5><i class="fas fa-chart-line"></i> Indicateurs Économiques</h5>
+                                <div class="economics-value" id="payback-period">-- ans</div>
+                                <div class="economics-breakdown">
+                                    <span>ROI: <span id="roi">--%</span></span>
+                                    <span>NPV: <span id="npv">-- k$</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="economics-tips">
+                            <h5><i class="fas fa-lightbulb"></i> Recommandations</h5>
+                            <div class="tips-list">
+                                <div class="tip">
+                                    <i class="fas fa-check-circle"></i>
+                                    <p>Optimiser le reflux peut réduire les coûts énergétiques de 15-25%</p>
+                                </div>
+                                <div class="tip">
+                                    <i class="fas fa-check-circle"></i>
+                                    <p>Améliorer l'efficacité des plateaux réduit l'investissement initial</p>
+                                </div>
+                                <div class="tip">
+                                    <i class="fas fa-check-circle"></i>
+                                    <p>Considérer l'intégration énergétique pour améliorer la rentabilité</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="sensitivity-tab" style="display: none;">
+                        <h4><i class="fas fa-chart-line"></i> Analyse de Sensibilité</h4>
+                        <div class="sensitivity-controls">
+                            <div class="form-group">
+                                <label>Paramètre à analyser:</label>
+                                <select id="sensitivity-param">
+                                    <option value="reflux">Facteur de reflux (R/R_min)</option>
+                                    <option value="efficiency">Efficacité des plateaux</option>
+                                    <option value="recovery">Récupération LK</option>
+                                    <option value="pressure">Pression opératoire</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Plage d'analyse:</label>
+                                <div class="range-inputs">
+                                    <input type="number" id="sensitivity-min" placeholder="Min" value="1.1">
+                                    <span>à</span>
+                                    <input type="number" id="sensitivity-max" placeholder="Max" value="2.0">
+                                    <button class="btn btn-sm" onclick="app.runSensitivityAnalysis()">
+                                        <i class="fas fa-play"></i> Analyser
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="sensitivity-chart">
+                            <canvas id="sensitivity-chart"></canvas>
+                        </div>
+                        
+                        <div class="sensitivity-results">
+                            <h5>Conclusions:</h5>
+                            <div id="sensitivity-conclusions">
+                                <p>Exécutez une analyse de sensibilité pour voir les conclusions</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="optimization-tab" style="display: none;">
+                        <h4><i class="fas fa-magic"></i> Suggestions d'Optimisation</h4>
+                        <div class="optimization-grid">
+                            <div class="optimization-card">
+                                <h5><i class="fas fa-retweet"></i> Optimisation du Reflux</h5>
+                                <div class="optimization-value" id="opt-reflux">R = --</div>
+                                <p>Valeur optimale estimée pour minimiser les coûts totaux</p>
+                                <button class="btn btn-sm" onclick="app.applyOptimization('reflux')">
+                                    <i class="fas fa-check"></i> Appliquer
+                                </button>
+                            </div>
+                            <div class="optimization-card">
+                                <h5><i class="fas fa-percentage"></i> Efficacité des Plateaux</h5>
+                                <div class="optimization-value" id="opt-efficiency">--%</div>
+                                <p>Niveau recommandé pour équilibrer investissement et performance</p>
+                                <button class="btn btn-sm" onclick="app.applyOptimization('efficiency')">
+                                    <i class="fas fa-check"></i> Appliquer
+                                </button>
+                            </div>
+                            <div class="optimization-card">
+                                <h5><i class="fas fa-filter"></i> Spécifications</h5>
+                                <div class="optimization-value" id="opt-recovery">--%</div>
+                                <p>Récupérations optimales pour la pureté souhaitée</p>
+                                <button class="btn btn-sm" onclick="app.applyOptimization('recovery')">
+                                    <i class="fas fa-check"></i> Appliquer
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="optimization-impact">
+                            <h5><i class="fasfa-chart-bar"></i> Impact de l'Optimisation</h5>
+                            <table class="impact-table">
+                                <thead>
+                                    <tr>
+                                        <th>Paramètre</th>
+                                        <th>Avant</th>
+                                        <th>Après</th>
+                                        <th>Amélioration</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="impact-body">
+                                    <tr>
+                                        <td colspan="4">Appliquez une optimisation pour voir l'impact</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Panel d'aide et documentation -->
+            <section class="card help-panel" id="aide">
+                <div class="card-header">
+                    <h2><i class="fas fa-question-circle"></i> Aide & Documentation</h2>
+                </div>
+                <div class="card-body">
+                    <div class="help-grid">
+                        <div class="help-item">
+                            <h4><i class="fas fa-book"></i> Théorie des Méthodes</h4>
+                            <div class="method-list">
+                                <div class="method">
+                                    <h5>Équation de Fenske</h5>
+                                    <p>Calcul du nombre minimum de plateaux théoriques pour une séparation donnée</p>
+                                    <code>N_min = ln[(x_LK/x_HK)_D × (x_HK/x_LK)_B] / ln(α_LK/HK)</code>
+                                </div>
+                                <div class="method">
+                                    <h5>Méthode d'Underwood</h5>
+                                    <p>Détermination du reflux minimum nécessaire pour la séparation</p>
+                                    <code>∑(α_i × z_i)/(α_i - θ) = 1 - q</code>
+                                </div>
+                                <div class="method">
+                                    <h5>Corrélation de Gilliland</h5>
+                                    <p>Relation empirique entre reflux et nombre de plateaux</p>
+                                    <code>Y = 1 - exp[(1+54.4X)(X-1)/((11+117.2X)√X)]</code>
+                                </div>
+                                <div class="method">
+                                    <h5>Équation de Kirkbride</h5>
+                                    <p>Position optimale du plateau d'alimentation</p>
+                                    <code>log(N_R/N_S) = 0.206 log[(B/D)(z_HK/z_LK)(x_LK_B/x_HK_D)²]</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="help-item">
+                            <h4><i class="fas fa-info-circle"></i Guide d'Utilisation</h4>
+                            <div class="guide-steps">
+                                <div class="step">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <h5>Sélection des Composés</h5>
+                                        <p>Recherchez et sélectionnez jusqu'à 3 composés dans la base de données</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <h5>Définition de la Composition</h5>
+                                        <p>Définissez les fractions molaires de l'alimentation (total = 100%)</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <h5>Paramètres Opératoires</h5>
+                                        <p>Réglez le débit, la pression, la qualité de l'alimentation et l'efficacité</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">4</div>
+                                    <div class="step-content">
+                                        <h5>Spécifications de Séparation</h5>
+                                        <p>Définissez les récupérations souhaitées pour les composés clés</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">5</div>
+                                    <div class="step-content">
+                                        <h5>Lancement de la Simulation</h5>
+                                        <p>Exécutez la simulation et analysez les résultats</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="help-item">
+                            <h4><i class="fas fa-download"></i> Export et Partage</h4>
+                            <div class="export-options">
+                                <div class="export-option">
+                                    <h5><i class="fas fa-file-pdf"></i> Rapport PDF</h5>
+                                    <p>Générez un rapport complet au format PDF incluant tous les résultats et graphiques</p>
+                                    <button class="btn btn-sm" onclick="app.exportPDF()">
+                                        <i class="fas fa-download"></i> Générer PDF
+                                    </button>
+                                </div>
+                                <div class="export-option">
+                                    <h5><i class="fas fa-file-csv"></i> Données CSV</h5>
+                                    <p>Exportez les données numériques au format CSV pour analyse externe</p>
+                                    <button class="btn btn-sm" onclick="app.exportCSV()">
+                                        <i class="fas fa-download"></i> Exporter CSV
+                                    </button>
+                                </div>
+                                <div class="export-option">
+                                    <h5><i class="fas fa-share-alt"></i> Partage</h5>
+                                    <p>Partagez la configuration de simulation via un lien unique</p>
+                                    <button class="btn btn-sm" onclick="app.generateShareLink()">
+                                        <i class="fas fa-link"></i> Générer Lien
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="help-tips">
+                                <h5><i class="fas fa-lightbulb"></i> Conseils Pratiques</h5>
+                                <ul>
+                                    <li>Les valeurs typiques de R/R_min sont entre 1.2 et 1.5</li>
+                                    <li>L'efficacité des plateaux varie généralement entre 60% et 80%</li>
+                                    <li>Pour une première estimation, utilisez les exemples prédéfinis</li>
+                                    <li>Consultez l'analyse de sensibilité pour optimiser les paramètres</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-content">
+                    <div class="footer-info">
+                        <p><i class="fas fa-university"></i> FST SETTAT (FSTS)</p>
+                        <p><i class="fas fa-user-graduate"></i> Cours: Modélisation et Simulation des Procédés</p>
+                        <p><i class="fas fa-user-tie"></i> ZAKRAOUI Mohamed</p>
+                    </div>
+                    <div class="footer-technical">
+                        <p><i class="fas fa-code"></i> Développé avec HTML5, CSS3, JavaScript</p>
+                        <p><i class="fas fa-chart-line"></i> Visualisations: Chart.js & Plotly</p>
+                        <p><i class="fas fa-calculator"></i> Algorithmes: Fenske, Underwood, Gilliland, Kirkbride</p>
+                    </div>
+                    <div class="footer-copyright">
+                        <p>&copy; 2025 - Simulateur de Distillation Multicomposants | Version Web 2.0</p>
+                        <p class="disclaimer">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Ce simulateur fournit des estimations pour des études préliminaires. 
+                            Pour des projets industriels, consultez un ingénieur procédés - ZAKRAOUI Mohamed
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications-container"></div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/thermo-engine.js') }}"></script>
+<script src="{{ url_for('static', filename='js/compound-search.js') }}"></script>
+<script src="{{ url_for('static', filename='js/distillation-engine.js') }}"></script>
+<script src="{{ url_for('static', filename='js/visualization.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <script>
+        // Initialisation de l'application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Masquer l'écran de chargement après 1 seconde
+            setTimeout(function() {
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'block';
+                
+                // Initialiser l'application
+                if (typeof app !== 'undefined') {
+                    app.initializeApp();
+                } else {
+                    console.error('L\'application n\'est pas définie');
+                    document.getElementById('app-container').innerHTML = `
+                        <div class="error-screen">
+                            <i class="fas fa-exclamation-triangle fa-3x"></i>
+                            <h2>Erreur de chargement</h2>
+                            <p>Impossible de charger l'application. Vérifiez les fichiers JavaScript.</p>
+                            <button onclick="location.reload()">
+                                <i class="fas fa-redo"></i> Recharger la page
+                            </button>
+                        </div>
+                    `;
+                }
+            }, 1000);
+        });
+        
+        // Gestion des erreurs globales
+        window.addEventListener('error', function(e) {
+            console.error('Erreur globale:', e.error);
+            
+            const notification = document.createElement('div');
+            notification.className = 'notification notification-error';
+            notification.innerHTML = `
+                <i class="fas fa-exclamation-circle"></i>
+                <div>
+                    <strong>Erreur JavaScript:</strong>
+                    <p>${e.message}</p>
+                    <small>${e.filename} - Ligne ${e.lineno}</small>
+                </div>
+                <button onclick="this.parentElement.remove()">&times;</button>
+            `;
+            
+            document.getElementById('notifications-container').appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 10000);
+        });
+    </script>
+    
+    <style>
+        /* Styles pour l'écran de chargement et d'erreur */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .loading i {
+            color: #3498db;
+            margin-bottom: 20px;
+        }
+        
+        .error-screen {
+            text-align: center;
+            padding: 100px 20px;
+            color: #e74c3c;
+        }
+        
+        .error-screen button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        
+        .error-screen button:hover {
+            background: #2980b9;
+        }
+        
+        /* Notifications */
+        #notifications-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+        }
+        
+        .notification {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 15px;
+            margin-bottom: 10px;
+            min-width: 300px;
+            max-width: 400px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: slideInRight 0.3s ease;
+            border-left: 4px solid #3498db;
+        }
+        
+        .notification-success {
+            border-left-color: #2ecc71;
+        }
+        
+        .notification-error {
+            border-left-color: #e74c3c;
+        }
+        
+        .notification-warning {
+            border-left-color: #f39c12;
+        }
+        
+        .notification i {
+            font-size: 1.2em;
+            margin-top: 2px;
+        }
+        
+        .notification-success i {
+            color: #2ecc71;
+        }
+        
+        .notification-error i {
+            color: #e74c3c;
+        }
+        
+        .notification-warning i {
+            color: #f39c12;
+        }
+        
+        .notification div {
+            flex: 1;
+        }
+        
+        .notification strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .notification p {
+            margin: 0;
+            font-size: 0.9em;
+        }
+        
+        .notification small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.8em;
+        }
+        
+        .notification button {
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .notification button:hover {
+            color: #666;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Styles pour les messages d'attente */
+        .loading-search, .placeholder-text, .info-placeholder, .empty-table {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .info-placeholder i, .loading-search i {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #adb5bd;
+            display: block;
+        }
+        
+        /* Responsive design de base */
+        @media (max-width: 1200px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .material-balance {
+                flex-direction: column;
+            }
+            
+            .stream-arrow {
+                transform: rotate(90deg);
+                margin: 15px 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header .container {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .navbar .container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .nav-menu {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .summary-cards, .energy-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .summary-cards, .energy-grid, .parameters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .card-body {
+                padding: 15px;
+            }
+        }
+    </style>
+</body>
+</html>

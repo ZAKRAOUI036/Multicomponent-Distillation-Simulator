@@ -1,0 +1,212 @@
+/* compound-search.css */
+
+/* Search box */
+.compound-search-box {
+    margin: 1rem 0;
+}
+
+.search-input-group {
+    display: flex;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 10px 15px;
+    background: white;
+}
+
+.search-input-group input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    padding: 5px;
+}
+
+.btn-search {
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 15px;
+    cursor: pointer;
+}
+
+/* Search results */
+.search-results {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.results-header {
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #ddd;
+}
+
+.result-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.result-item:hover {
+    background: #f8f9fa;
+}
+
+.compound-name {
+    font-weight: 500;
+}
+
+.compound-formula {
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* Selected compounds */
+.selected-compounds-container {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.selected-compound-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.compound-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.compound-index {
+    background: #3498db;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.compound-properties {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.property {
+    background: #e3f2fd;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* Composition inputs */
+.composition-inputs {
+    margin: 1rem 0;
+}
+
+.composition-input-group {
+    margin-bottom: 1rem;
+}
+
+.input-with-slider {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.composition-slider {
+    flex: 1;
+}
+
+.composition-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.composition-ok {
+    color: #2ecc71;
+    font-weight: bold;
+}
+
+.composition-error {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* Status badges */
+.status-badge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9em;
+}
+
+.status-success {
+    background: #2ecc71;
+    color: white;
+}
+
+.status-warning {
+    background: #f39c12;
+    color: white;
+}
+
+.status-error {
+    background: #e74c3c;
+    color: white;
+}
+
+/* Notifications */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    max-width: 400px;
+    z-index: 10000;
+    background: white;
+    border-left: 4px solid #3498db;
+}
+
+.notification-success {
+    border-left-color: #2ecc71;
+}
+
+.notification-error {
+    border-left-color: #e74c3c;
+}
+
+.notification-warning {
+    border-left-color: #f39c12;
+}
+
+.notification button {
+    background: none;
+    border: none;
+    font-size: 1.2em;
+    cursor: pointer;
+    color: #999;
+}
