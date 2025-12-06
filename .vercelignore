@@ -1,0 +1,8 @@
+requirements.txt
+runtime.txt
+Procfile
+app.py
+*.py
+__pycache__/
+venv/
+.env
